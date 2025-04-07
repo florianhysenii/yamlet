@@ -29,7 +29,7 @@ def spark():
     spark.stop()
 
 def test_full_etl_pipeline(spark):
-    """Test the full ETL pipeline end-to-end with dummy data, including CDC, transformations, and SCD2 logic."""
+    """Testing the full ETL pipeline end-to-end with dummy data, including CDC, transformations, and SCD2 logic."""
     logger.info("Setting up dummy source data for MySQL and PostgreSQL.")
 
     data_mysql = [
