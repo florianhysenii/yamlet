@@ -1,0 +1,8 @@
+connections:
+  mysql:
+    testdb:
+      host: "localhost"
+      port: 3306
+      database: "testdb"
+      user: "root"
+      password: "password"

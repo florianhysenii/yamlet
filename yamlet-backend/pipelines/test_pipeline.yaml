@@ -1,0 +1,60 @@
+name: TestPipeline
+# ----- Setup Instructions for MySQL Tables -----
+# 1. Create the source table (if not exists) and insert dummy data:
+#
+# CREATE TABLE IF NOT EXISTS testdb.reports (
+#     id INT AUTO_INCREMENT PRIMARY KEY,
+#     name VARCHAR(50) NULL,
+#     some_column INT NULL
+# );
+#
+# INSERT INTO testdb.reports (name, some_column) VALUES
+# ('Alice', 100),
+# ('Bob', 300),
+# ('Charlie', 400);
+#
+# 2. Create a target table to store the pipeline results:
+#
+# CREATE TABLE IF NOT EXISTS testdb.target_reports (
+#     id INT AUTO_INCREMENT PRIMARY KEY,
+#     name VARCHAR(50) NULL,
+#     some_column INT NULL,
+#     score_category VARCHAR(10) NULL
+# );
+# ---------------------------------------------------
+
+source:
+  type: mysql
+  connection: "testdb" 
+  config:
+    table: "reports"
+    cdc:
+      enabled: false
+      mode: timestamp
+      timestamp:
+        column: "some_column"
+
+transformations:
+  - type: sql
+    config:
+      query: |
+        -- Create an enriched view that uppercases the name and categorizes some_column.
+        CREATE OR REPLACE TEMP VIEW enriched AS
+        SELECT 
+            id, 
+            UPPER(name) AS name, 
+            some_column,
+            CASE WHEN some_column > 250 THEN 'High' ELSE 'Low' END AS score_category
+        FROM temp_table;
+        SELECT * FROM enriched;
+
+target:
+  type: jdbc
+  connection: "testdb"
+  config:
+    db_type: "mysql"
+    table: "target_reports"
+    mode: "append"
+
+scheduler: cron
+schedule_cron: "0 2 * * *"
