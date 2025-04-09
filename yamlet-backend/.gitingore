@@ -12,6 +12,10 @@ env/
 ENV/
 .venv/
 
+# Ignore Python cache files
+__pycache__/
+*.py[cod]
+
 # FastAPI specific
 *.sqlite3
 .db
