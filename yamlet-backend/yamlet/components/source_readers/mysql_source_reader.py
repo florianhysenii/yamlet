@@ -8,10 +8,11 @@ class MySQLSourceReader(JDBCSourceReader):
     """
     def __init__(self, source_config: dict):
         """
-        Initialize the MySQL source reader and set up MySQL-specific JDBC parameters.
+        Initialize the MySQL source reader.
         
         Args:
-            source_config (dict): Configuration including host, port, database, user, password, table.
+            source_config (dict): Configuration including host, port, database, user, password,
+                                  and a query to read data.
         """
         super().__init__(source_config)
         self.jdbc_url = f"jdbc:mysql://{self.host}:{self.port}/{self.database}"
