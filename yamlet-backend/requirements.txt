@@ -7,5 +7,6 @@ uvicorn>=0.34.0
 mypy>=1.15.0
 python-crontab>=3.2.0
 python-multipart>=0.0.20
-crontab
-requests
+crontab>= 3.2.0
+sqlalchemy>= 2.0.40
+albmbic>=1.15.2

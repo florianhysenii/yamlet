@@ -30,6 +30,8 @@ pip install -r requirements.txt
 uvicorn yamlet.api:app --reload
 ```
 
+
+### to run migrations alembic init alembic.
 # 🧩 Notes
 Make sure Java and PySpark are installed and configured on your system.
 
