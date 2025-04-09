@@ -17,6 +17,8 @@ from yamlet.components.target_writers.jdbc_target_writer import JDBCTargetWriter
 from yamlet.components.target_writers.s3_target_writer import S3TargetWriter
 
 from yamlet.components.scheduler.cron_scheduler import CronScheduler
+from yamlet.components.scheduler.airflow_scheduler import AirflowScheduler
+
 
 # Mapping dictionaries
 SOURCE_READERS: Dict[str, Any] = {
@@ -133,7 +135,13 @@ def load_pipeline_config(file_path: str) -> Pipeline:
     # 4) Scheduler
     schedule_cron = config.get("schedule_cron", "")
     scheduler_type = config.get("scheduler", "").lower()
-    scheduler_instance = CronScheduler() if scheduler_type == "cron" else None
+    if scheduler_type == "cron":
+        scheduler_instance = CronScheduler()
+    elif scheduler_type == "airflow":
+        dag_id = config.get("dag_id", "default_dag")
+        scheduler_instance = AirflowScheduler(dag_id)
+    else:
+        scheduler_instance = None
 
     pipeline = Pipeline(
         name=name,

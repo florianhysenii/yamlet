@@ -1,46 +1,112 @@
 // src/App.js
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { DndProvider, useDrag, useDrop } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 import yaml from 'js-yaml';
 
-// Define the drag item type.
+// Material-UI components
+import {
+  AppBar,
+  Toolbar,
+  IconButton,
+  Typography,
+  Box,
+  Paper,
+  TextField,
+  Button,
+  Fade,
+  Slide,
+  createTheme,
+  ThemeProvider,
+  CssBaseline,
+} from '@mui/material';
+
+// MUI icons
+import StorageIcon from '@mui/icons-material/Storage';
+import BuildIcon from '@mui/icons-material/Build';
+import CloudDoneIcon from '@mui/icons-material/CloudDone';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import AccountCircleIcon from '@mui/icons-material/AccountCircle';
+
 const ItemTypes = {
   BLOCK: 'block',
 };
 
-// Basic inline styles.
-const blockStyle = {
-  border: '1px solid #ccc',
-  borderRadius: '4px',
-  padding: '16px',
-  margin: '8px 0',
-  backgroundColor: '#fff',
-  cursor: 'move',
-};
+// ------------------- Custom Theme -------------------
+const customTheme = createTheme({
+  typography: {
+    fontFamily: 'Poppins, Roboto, sans-serif',
+  },
+  palette: {
+    primary: {
+      main: '#2c3e50',
+    },
+    secondary: {
+      main: '#2980b9',
+    },
+  },
+});
 
-const modalOverlayStyle = {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  width: '100%',
-  height: '100%',
-  backgroundColor: 'rgba(0,0,0,0.5)',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-};
+// ------------------- VersionSidebar Component -------------------
+function VersionSidebar({ pipelineName }) {
+  const [versions, setVersions] = useState([]);
+  const [error, setError] = useState(null);
 
-const modalContentStyle = {
-  backgroundColor: '#fff',
-  padding: '20px',
-  borderRadius: '4px',
-  width: '400px',
-  maxWidth: '90%',
-};
+  useEffect(() => {
+    const fetchVersions = async () => {
+      try {
+        const response = await fetch(`/pipelines/${pipelineName}/versions`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch versions');
+        }
+        const data = await response.json();
+        setVersions(data.versions || []);
+      } catch (err) {
+        setError(err.toString());
+      }
+    };
 
-// ----- PipelineBlock Component -----
-function PipelineBlock({ block, index, moveBlock, onEdit }) {
+    fetchVersions();
+  }, [pipelineName]);
+
+  return (
+    <Box
+      sx={{
+        position: 'fixed',
+        right: 0,
+        top: 64, // Below the AppBar
+        width: '250px',
+        height: 'calc(100% - 64px)',
+        backgroundColor: '#fafafa',
+        borderLeft: '1px solid #ccc',
+        p: 2,
+        overflowY: 'auto',
+        zIndex: 1200,
+      }}
+    >
+      <Typography variant="h6" gutterBottom>
+        Pipeline Versions
+      </Typography>
+      {error ? (
+        <Typography variant="body2" color="error">
+          {error}
+        </Typography>
+      ) : versions.length > 0 ? (
+        versions.map((v) => (
+          <Box key={v.id} sx={{ mb: 2, borderBottom: '1px solid #ddd', pb: 1 }}>
+            <Typography variant="subtitle2">Version: {v.version}</Typography>
+            <Typography variant="caption">Created: {v.created_at}</Typography>
+          </Box>
+        ))
+      ) : (
+        <Typography variant="body2">No versions available.</Typography>
+      )}
+    </Box>
+  );
+}
+
+// ------------------- PipelineBlock Component -------------------
+function PipelineBlock({ block, index, moveBlock, onSelect }) {
   const ref = useRef(null);
 
   const [, drop] = useDrop({
@@ -51,11 +117,12 @@ function PipelineBlock({ block, index, moveBlock, onEdit }) {
       const hoverIndex = index;
       if (dragIndex === hoverIndex) return;
       const hoverBoundingRect = ref.current.getBoundingClientRect();
-      const hoverMiddleY = (hoverBoundingRect.bottom - hoverBoundingRect.top) / 2;
+      const hoverMiddleX =
+        (hoverBoundingRect.right - hoverBoundingRect.left) / 2;
       const clientOffset = monitor.getClientOffset();
-      const hoverClientY = clientOffset.y - hoverBoundingRect.top;
-      if (dragIndex < hoverIndex && hoverClientY < hoverMiddleY) return;
-      if (dragIndex > hoverIndex && hoverClientY > hoverMiddleY) return;
+      const hoverClientX = clientOffset.x - hoverBoundingRect.left;
+      if (dragIndex < hoverIndex && hoverClientX < hoverMiddleX) return;
+      if (dragIndex > hoverIndex && hoverClientX > hoverMiddleX) return;
       moveBlock(dragIndex, hoverIndex);
       item.index = hoverIndex;
     },
@@ -63,144 +130,225 @@ function PipelineBlock({ block, index, moveBlock, onEdit }) {
 
   const [{ isDragging }, drag] = useDrag({
     type: ItemTypes.BLOCK,
-    item: { id: block.id, index, type: ItemTypes.BLOCK },
+    item: { id: block.id, index },
     collect: (monitor) => ({
       isDragging: monitor.isDragging(),
     }),
   });
 
+  const style = {
+    width: 130,
+    minHeight: 90,
+    padding: 1,
+    border: '2px solid',
+    borderColor: block.selected ? '#2980b9' : '#ccc',
+    borderRadius: 2,
+    backgroundColor: '#fff',
+    cursor: 'move',
+    textAlign: 'center',
+    opacity: isDragging ? 0.6 : 1,
+    boxShadow: block.selected
+      ? '0 0 10px rgba(41,128,185,0.4)'
+      : '0 1px 3px rgba(0,0,0,0.2)',
+    transition: 'transform 0.15s ease-out',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+  };
+
+  const handleClick = () => {
+    if (ref.current) {
+      ref.current.style.transform = 'scale(0.95)';
+      setTimeout(() => {
+        ref.current.style.transform = 'scale(1)';
+        onSelect(block.id);
+      }, 80);
+    }
+  };
+
   drag(drop(ref));
 
-  return (
-    <div
-      ref={ref}
-      style={{ ...blockStyle, opacity: isDragging ? 0.5 : 1 }}
-      onClick={() => onEdit(block.id)}
-    >
-      <h3>{block.title}</h3>
-      <p>{block.description}</p>
-    </div>
-  );
-}
-
-// ----- EditModal Component -----
-function EditModal({ block, onClose, onSave }) {
-  const [localConfig, setLocalConfig] = useState({ ...block.config });
-
-  const renderFields = () => {
-    if (block.type === 'source') {
-      return (
-        <>
-          <label>Connection Name:</label>
-          <input
-            type="text"
-            value={localConfig.connectionName || ''}
-            onChange={(e) =>
-              setLocalConfig({ ...localConfig, connectionName: e.target.value })
-            }
-            style={{ width: '100%', marginBottom: '10px' }}
-          />
-          <label>Table Name:</label>
-          <input
-            type="text"
-            value={localConfig.table || ''}
-            onChange={(e) =>
-              setLocalConfig({ ...localConfig, table: e.target.value })
-            }
-            style={{ width: '100%' }}
-          />
-        </>
-      );
-    } else if (block.type === 'transformation') {
-      return (
-        <>
-          <label>SQL Query:</label>
-          <textarea
-            rows="8"
-            cols="40"
-            value={localConfig.query || ''}
-            onChange={(e) =>
-              setLocalConfig({ ...localConfig, query: e.target.value })
-            }
-            style={{ width: '100%' }}
-          />
-        </>
-      );
-    } else if (block.type === 'target') {
-      return (
-        <>
-          <label>Connection Name:</label>
-          <input
-            type="text"
-            value={localConfig.connectionName || ''}
-            onChange={(e) =>
-              setLocalConfig({ ...localConfig, connectionName: e.target.value })
-            }
-            style={{ width: '100%', marginBottom: '10px' }}
-          />
-          <label>Table Name:</label>
-          <input
-            type="text"
-            value={localConfig.table || ''}
-            onChange={(e) =>
-              setLocalConfig({ ...localConfig, table: e.target.value })
-            }
-            style={{ width: '100%' }}
-          />
-        </>
-      );
-    } else {
-      return <p>No configuration available for this block type.</p>;
+  const getIcon = () => {
+    switch (block.type) {
+      case 'source':
+        return <StorageIcon sx={{ color: '#2ecc71', fontSize: 28 }} />;
+      case 'transformation':
+        return <BuildIcon sx={{ color: '#e67e22', fontSize: 28 }} />;
+      case 'target':
+        return <CloudDoneIcon sx={{ color: '#2980b9', fontSize: 28 }} />;
+      default:
+        return null;
     }
   };
 
   return (
-    <div style={modalOverlayStyle}>
-      <div style={modalContentStyle}>
-        <h2>Edit {block.title}</h2>
-        {renderFields()}
-        <div style={{ marginTop: '20px', textAlign: 'right' }}>
-          <button onClick={() => onSave(block.id, localConfig)} style={{ marginRight: '10px' }}>
-            Save
-          </button>
-          <button onClick={onClose}>Cancel</button>
-        </div>
-      </div>
-    </div>
+    <Paper ref={ref} sx={style} onClick={() => onSelect(block.id)}>
+      <Box sx={{ mb: 1 }}>{getIcon()}</Box>
+      <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>
+        {block.title}
+      </Typography>
+      <Typography variant="body2" sx={{ color: '#666' }}>
+        {block.description}
+      </Typography>
+    </Paper>
   );
 }
 
-// ----- PipelineDesigner Component -----
+// ------------------- ConfigPanel Component -------------------
+function ConfigPanel({ block, onSave, onClose }) {
+  const [localConfig, setLocalConfig] = useState({ ...block.config });
+
+  const renderFields = () => {
+    // For source blocks, show connection name and SQL query (instead of table)
+    if (block.type === 'source') {
+      return (
+        <>
+          <TextField
+            label="Connection Name"
+            variant="outlined"
+            size="small"
+            fullWidth
+            sx={{ mb: 2 }}
+            value={localConfig.connectionName || ''}
+            onChange={(e) =>
+              setLocalConfig({ ...localConfig, connectionName: e.target.value })
+            }
+          />
+          <TextField
+            label="SQL Query"
+            variant="outlined"
+            size="small"
+            fullWidth
+            multiline
+            rows={3}
+            sx={{ mb: 2 }}
+            value={localConfig.query || 'SELECT * FROM reports'}
+            onChange={(e) =>
+              setLocalConfig({ ...localConfig, query: e.target.value })
+            }
+          />
+        </>
+      );
+    }
+    // For target blocks, show connection name and table name.
+    if (block.type === 'target') {
+      return (
+        <>
+          <TextField
+            label="Connection Name"
+            variant="outlined"
+            size="small"
+            fullWidth
+            sx={{ mb: 2 }}
+            value={localConfig.connectionName || ''}
+            onChange={(e) =>
+              setLocalConfig({ ...localConfig, connectionName: e.target.value })
+            }
+          />
+          <TextField
+            label="Table Name"
+            variant="outlined"
+            size="small"
+            fullWidth
+            sx={{ mb: 2 }}
+            value={localConfig.table || ''}
+            onChange={(e) =>
+              setLocalConfig({ ...localConfig, table: e.target.value })
+            }
+          />
+        </>
+      );
+    }
+    // For transformation blocks, show the SQL query.
+    if (block.type === 'transformation') {
+      return (
+        <TextField
+          label="SQL Query"
+          variant="outlined"
+          size="small"
+          fullWidth
+          multiline
+          rows={6}
+          sx={{ mb: 2 }}
+          value={localConfig.query || ''}
+          onChange={(e) =>
+            setLocalConfig({ ...localConfig, query: e.target.value })
+          }
+        />
+      );
+    }
+    return <Typography>No configuration available for this block type.</Typography>;
+  };
+
+  return (
+    <Slide in={true} direction="up" mountOnEnter unmountOnExit>
+      <Box
+        sx={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: '#fff',
+          borderTop: '1px solid #ccc',
+          p: 2,
+          zIndex: 1300,
+        }}
+      >
+        <Typography variant="h6" gutterBottom>
+          Editing: {block.title}
+        </Typography>
+        {renderFields()}
+        <Box sx={{ textAlign: 'right' }}>
+          <Button variant="contained" onClick={() => onSave(block.id, localConfig)} sx={{ mr: 1 }}>
+            Save
+          </Button>
+          <Button variant="outlined" onClick={onClose}>
+            Cancel
+          </Button>
+        </Box>
+      </Box>
+    </Slide>
+  );
+}
+
+// ------------------- PipelineDesigner Component -------------------
 function PipelineDesigner() {
   const [blocks, setBlocks] = useState([
     {
       id: 1,
       type: 'source',
       title: 'Source',
-      description: 'Configure your SQL source connection.',
-      config: { connectionName: '', table: '' },
+      description: 'SQL source connection',
+      config: { connectionName: '', query: 'SELECT * FROM reports' },
+      selected: false,
     },
     {
       id: 2,
       type: 'transformation',
       title: 'Transformation',
-      description: 'Define your SQL transformation.',
+      description: 'SQL transformation',
       config: {
         query:
           "-- Write your SQL transformation here.\nCREATE OR REPLACE TEMP VIEW enriched AS\nSELECT id, UPPER(name) AS name, some_column,\nCASE WHEN some_column > 250 THEN 'High' ELSE 'Low' END AS score_category\nFROM temp_table;\nSELECT * FROM enriched;",
       },
+      selected: false,
     },
     {
       id: 3,
       type: 'target',
       title: 'Target',
-      description: 'Configure your target connection.',
-      config: { connectionName: '', table: '' },
+      description: 'Output connection',
+      config: { connectionName: '', table: 'target_reports' },
+      selected: false,
     },
   ]);
-  const [editingBlockId, setEditingBlockId] = useState(null);
+
   const [generatedYaml, setGeneratedYaml] = useState('');
   const [submitMessage, setSubmitMessage] = useState('');
+
+  // Determine the selected block (if any) for config editing.
+  const selectedBlock = blocks.find((b) => b.selected) || null;
 
   const moveBlock = (fromIndex, toIndex) => {
     const updated = [...blocks];
@@ -209,61 +357,72 @@ function PipelineDesigner() {
     setBlocks(updated);
   };
 
-  const handleEdit = (blockId) => {
-    setEditingBlockId(blockId);
-  };
-
-  const handleCloseModal = () => {
-    setEditingBlockId(null);
+  const handleSelectBlock = (blockId) => {
+    setBlocks(blocks.map((b) => ({ ...b, selected: b.id === blockId })));
   };
 
   const handleSaveBlock = (blockId, newConfig) => {
-    const updated = blocks.map((b) =>
-      b.id === blockId ? { ...b, config: newConfig } : b
+    setBlocks(
+      blocks.map((b) =>
+        b.id === blockId ? { ...b, config: newConfig } : b
+      )
     );
-    setBlocks(updated);
-    setEditingBlockId(null);
   };
 
-  // Generate pipeline YAML with structured sections.
+  const handleClosePanel = () => {
+    setBlocks(blocks.map((b) => ({ ...b, selected: false })));
+  };
+
+  // Generate pipeline YAML with your desired structure.
   const generatePipelineYaml = () => {
     const sourceBlock = blocks.find((b) => b.type === 'source') || {};
     const transformationBlock = blocks.find((b) => b.type === 'transformation') || {};
     const targetBlock = blocks.find((b) => b.type === 'target') || {};
 
+    // Build source config with query (no table needed).
+    const sourceConfig = {
+      host: 'localhost',
+      port: 3306,
+      database: 'testdb',
+      query: sourceBlock.config?.query || 'SELECT * FROM reports',
+      cdc: {
+        enabled: false,
+        mode: 'timestamp',
+        timestamp: { column: 'some_column' },
+      },
+    };
+
     const pipeline = {
-      name: "TestPipeline",
+      name: 'TestPipeline',
       source: {
-        type: "mysql",
-        connection: sourceBlock.config.connectionName || "testdb",
-        config: {
-          table: sourceBlock.config.table || "reports",
-          cdc: {
-            enabled: false,
-            mode: "timestamp",
-            timestamp: { column: "some_column" },
-          },
-        },
+        type: 'mysql',
+        connection: sourceBlock.config?.connectionName || 'testdb',
+        config: sourceConfig,
       },
       transformations: [
         {
-          type: "sql",
+          type: 'sql',
           config: {
-            query: transformationBlock.config.query || "-- SQL transformation placeholder",
+            query: transformationBlock.config?.query || '-- no transformation',
           },
         },
       ],
       target: {
-        type: "jdbc",
-        connection: targetBlock.config.connectionName || "testdb",
+        type: 'jdbc',
+        connection: targetBlock.config?.connectionName || 'testdb',
         config: {
-          db_type: "mysql",
-          table: targetBlock.config.table || "target_reports",
-          mode: "append",
+          db_type: 'mysql',
+          host: 'localhost',
+          port: 3306,
+          database: 'testdb',
+          table: targetBlock.config?.table || 'target_reports',
+          user: 'root',
+          password: 'password',
+          mode: 'append',
         },
       },
-      scheduler: "cron",
-      schedule_cron: "0 2 * * *",
+      scheduler: 'cron',
+      schedule_cron: '0 2 * * *',
     };
 
     return yaml.dump(pipeline);
@@ -274,7 +433,6 @@ function PipelineDesigner() {
     setGeneratedYaml(yamlStr);
   };
 
-  // Submit the generated YAML to the backend.
   const handleSubmitPipeline = async () => {
     const yamlStr = generatePipelineYaml();
     const blob = new Blob([yamlStr], { type: 'text/yaml' });
@@ -293,54 +451,132 @@ function PipelineDesigner() {
     }
   };
 
+  // New function: Save Pipeline Version (calls separate endpoint)
+  const handleSaveVersion = async () => {
+    const yamlStr = generatePipelineYaml();
+    const blob = new Blob([yamlStr], { type: 'text/yaml' });
+    const formData = new FormData();
+    formData.append('file', blob, 'pipeline.yaml');
+
+    try {
+      // Note: Ensure your backend has an endpoint at /pipelines/save_version
+      const response = await fetch('/pipelines/save_version', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await response.json();
+      setSubmitMessage(`Version Saved: ${JSON.stringify(data)}`);
+    } catch (error) {
+      setSubmitMessage(`Error: ${error.toString()}`);
+    }
+  };
+
   return (
-    <div style={{ maxWidth: '700px', margin: '0 auto', padding: '20px', fontFamily: 'Arial, sans-serif' }}>
-      <h2>Pipeline Designer (Drag & Drop)</h2>
-      <p>Drag and drop blocks to reorder. Click a block to edit its configuration.</p>
-      {blocks.map((block, index) => (
-        <PipelineBlock
-          key={block.id}
-          block={block}
-          index={index}
-          moveBlock={moveBlock}
-          onEdit={handleEdit}
-        />
-      ))}
-      <div style={{ marginTop: '20px' }}>
-        <button onClick={handleGenerateYaml} style={{ marginRight: '10px' }}>
-          Generate Pipeline YAML
-        </button>
-        <button onClick={handleSubmitPipeline}>Run Pipeline</button>
-      </div>
-      {generatedYaml && (
-        <div style={{ marginTop: '20px', backgroundColor: '#f0f0f0', padding: '10px' }}>
-          <h4>Generated Pipeline YAML</h4>
-          <pre>{generatedYaml}</pre>
-        </div>
-      )}
-      {submitMessage && (
-        <div style={{ marginTop: '20px', padding: '10px', border: '1px solid #ccc' }}>
-          <strong>Response:</strong>
-          <pre>{submitMessage}</pre>
-        </div>
-      )}
-      {editingBlockId && (
-        <EditModal
-          block={blocks.find((b) => b.id === editingBlockId)}
-          onClose={handleCloseModal}
+    <Box sx={{ display: 'flex', height: '100vh', fontFamily: 'Arial, sans-serif' }}>
+      {/* Main content area */}
+      <Box sx={{ flex: 1, p: 2, overflowY: 'auto' }}>
+        <Typography variant="h5" sx={{ mb: 2, textAlign: 'center' }}>
+          Pipeline Designer
+        </Typography>
+
+        {/* Centered horizontal pipeline */}
+        <Box
+          sx={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            gap: 2,
+            mb: 2,
+            flexWrap: 'wrap',
+          }}
+        >
+          {blocks.map((block, index) => (
+            <React.Fragment key={block.id}>
+              <PipelineBlock
+                block={block}
+                index={index}
+                moveBlock={moveBlock}
+                onSelect={handleSelectBlock}
+              />
+              {index < blocks.length - 1 && (
+                <ArrowForwardIosIcon sx={{ fontSize: 30, color: '#7f8c8d' }} />
+              )}
+            </React.Fragment>
+          ))}
+        </Box>
+
+        {/* Action buttons */}
+        <Box sx={{ mt: 2, textAlign: 'center' }}>
+          <Button variant="contained" color="primary" sx={{ mr: 1 }} onClick={handleGenerateYaml}>
+            Generate YAML
+          </Button>
+          <Button variant="contained" color="secondary" sx={{ mr: 1 }} onClick={handleSubmitPipeline}>
+            Run Pipeline
+          </Button>
+          <Button variant="outlined" onClick={handleSaveVersion}>
+            Save Pipeline Version
+          </Button>
+        </Box>
+
+        {/* YAML output */}
+        {generatedYaml && (
+          <Fade in={true}>
+            <Box
+              sx={{
+                mt: 2,
+                p: 2,
+                backgroundColor: '#eee',
+                borderRadius: 2,
+                overflowX: 'auto',
+              }}
+            >
+              <Typography variant="subtitle1" sx={{ mb: 1 }}>
+                Generated Pipeline YAML
+              </Typography>
+              <pre style={{ margin: 0 }}>{generatedYaml}</pre>
+            </Box>
+          </Fade>
+        )}
+
+        {/* Submission response */}
+        {submitMessage && (
+          <Box
+            sx={{
+              mt: 2,
+              p: 2,
+              border: '1px solid #ccc',
+              borderRadius: 1,
+              textAlign: 'center',
+            }}
+          >
+            <Typography variant="subtitle1">Response:</Typography>
+            <pre style={{ margin: 0 }}>{submitMessage}</pre>
+          </Box>
+        )}
+      </Box>
+
+      {/* Right sidebar for pipeline versions */}
+      <VersionSidebar pipelineName="TestPipeline" />
+
+      {/* Bottom config panel: shown when a block is selected */}
+      {selectedBlock && (
+        <ConfigPanel
+          block={selectedBlock}
           onSave={handleSaveBlock}
+          onClose={handleClosePanel}
         />
       )}
-    </div>
+    </Box>
   );
 }
 
-function App() {
+export default function App() {
   return (
-    <DndProvider backend={HTML5Backend}>
-      <PipelineDesigner />
-    </DndProvider>
+    <ThemeProvider theme={customTheme}>
+      <CssBaseline />
+      <DndProvider backend={HTML5Backend}>
+        <PipelineDesigner />
+      </DndProvider>
+    </ThemeProvider>
   );
 }
-
-export default App;

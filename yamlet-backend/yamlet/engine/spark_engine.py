@@ -2,6 +2,7 @@ import os
 import logging
 from typing import Dict, Any
 from pyspark.sql import SparkSession, DataFrame
+import sys
 
 from yamlet.components.logic.cdc_handler import CDCHandler
 from yamlet.components.logic.scd2_handler import SCD2Handler
@@ -47,6 +48,7 @@ class SparkEngine:
         self.app_name = app_name
         self.master = master
         self.spark = None
+        # CDC and SCD2 handlers
         self.cdc_handler = None
         self.scd2_handler = None
 
@@ -61,14 +63,17 @@ class SparkEngine:
             iceberg_jar = os.path.join(jar_dir, "iceberg-spark-runtime-3.3_2.12-1.2.1.jar")
             mssql_jar = os.path.join(jar_dir, "sqljdbc42.jar")  # adjust as necessary
 
-            extra_classpath = f"{mysql_jar}:{postgres_jar}:{mssql_jar}:{iceberg_jar}"
-
+            # Use semicolon on Windows, colon otherwise.
+            sep = ";" if sys.platform.startswith("win") else ":"
+            extra_classpath = sep.join([mysql_jar, postgres_jar, mssql_jar, iceberg_jar])
+            
             logger.info("Starting Spark session with extra classpath: %s", extra_classpath)
             self.spark = (
                 SparkSession.builder
                 .appName(self.app_name)
                 .master(self.master)
                 .config("spark.driver.extraClassPath", extra_classpath)
+                .config("spark.executor.extraClassPath", extra_classpath)
                 .getOrCreate()
             )
 
@@ -202,7 +207,6 @@ class SparkEngine:
             return (self.spark.read.format("jdbc")
                     .option("url", url)
                     .option("driver", driver)
-                    .option("dbtable", cfg["table"])
                     .option("user", cfg["user"])
                     .option("password", cfg["password"])
                     .load())
